@@ -20,18 +20,16 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
-    secure: false,
+    secure: false, 
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS 
     },
-    // 👇 THIS IS THE KEY FIX FOR RENDER
-    family: 4, 
-    
-    // Keep your other settings
-    connectionTimeout: 10000,
+    family: 4, // Forces IPv4 (Gmail often fails on IPv6 in cloud containers)
+    connectionTimeout: 20000, // Increase to 20 seconds
+    greetingTimeout: 20000,
     tls: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false 
     }
 });
 
