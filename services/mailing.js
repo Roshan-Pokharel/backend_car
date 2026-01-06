@@ -1,15 +1,28 @@
 require('dotenv').config();
-const express = require('express');
-const router = express.Router();
 const nodemailer = require('nodemailer');
 
-
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // Must be false for port 587
     auth: {
-        // Use process.env to access variables from .env file
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS 
+    },
+    // Adding a timeout and TLS settings for Render's environment
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    tls: {
+        rejectUnauthorized: false // Helps avoid handshake issues in cloud environments
+    }
+});
+
+// This helps debug the connection in your Render logs immediately on startup
+transporter.verify((error, success) => {
+    if (error) {
+        console.error("SMTP Connection Error:", error.message);
+    } else {
+        console.log("Server is ready to send emails");
     }
 });
 
