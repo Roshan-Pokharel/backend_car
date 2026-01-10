@@ -2,22 +2,23 @@ const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // Use SSL - Important for Port 465
-    connectionOptions: {
-        family: 4
-        },
-        
+    port: 465, 
+    secure: true, // true for 465, false for other ports
     auth: {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS 
     },
-    // Add these timeout settings to prevent the "Timeout" error
+    // CRITICAL: Timeout and Connection fixes for Render
     connectionTimeout: 10000, // 10 seconds
     greetingTimeout: 10000,
-    socketTimeout: 10000
+    socketTimeout: 15000,
+    dnsTimeout: 5000,
+    connectionOptions: {
+        family: 4 // Forces IPv4 (solves many timeout issues on cloud hosts)
+    }
 });
 
+// Verify connection on startup
 transporter.verify((error, success) => {
     if (error) {
         console.error("❌ Nodemailer Setup Error:", error.message);
