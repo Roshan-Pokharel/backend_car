@@ -191,37 +191,97 @@ exports.updateBookingStatus = async (req, res) => {
 };
 
 // 5. Send OTP for Customer Management
+// exports.sendManageOtp = async (req, res) => {
+//   try {
+//     const { email } = req.body;
+//     const bookingExists = await Booking.findOne({ email });
+    
+//     if (!bookingExists) {
+//       return res.status(404).json({ success: false, message: 'No bookings found for this email.' });
+//     }
+
+//     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+//     otpStore[email] = otp;
+//     setTimeout(() => delete otpStore[email], 10 * 60 * 1000); // Expires in 10 mins
+
+//     await transporter.sendMail({
+//       from: process.env.EMAIL_USER,
+//       to: email,
+//       subject: 'Manage Your Booking - Verification Code',
+//       html: generateEmailTemplate('Identity Verification', `
+//           <h2>Your Verification Code</h2>
+//           <p>Please use the code below to access your booking dashboard:</p>
+//           <div style="background: #e2e8f0; color: #1e293b; padding: 15px 30px; display: inline-block; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 8px;">
+//               ${otp}
+//           </div>
+//           <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">This code expires in 10 minutes.</p>
+//       `)
+//     });
+
+//     res.json({ success: true, message: 'OTP sent' });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ success: false, message: 'Server error sending OTP' });
+//   }
+// };
+
+// 5. Send OTP for Customer Management (FIXED)
 exports.sendManageOtp = async (req, res) => {
   try {
     const { email } = req.body;
-    const bookingExists = await Booking.findOne({ email });
     
+    // Check if customer actually exists
+    const bookingExists = await Booking.findOne({ email });
     if (!bookingExists) {
-      return res.status(404).json({ success: false, message: 'No bookings found for this email.' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No bookings found for this email address.' 
+      });
     }
 
+    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Save to memory store
     otpStore[email] = otp;
-    setTimeout(() => delete otpStore[email], 10 * 60 * 1000); // Expires in 10 mins
+    
+    // Set expiration (10 minutes)
+    setTimeout(() => {
+        if(otpStore[email]) delete otpStore[email];
+    }, 10 * 60 * 1000);
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Manage Your Booking - Verification Code',
-      html: generateEmailTemplate('Identity Verification', `
-          <h2>Your Verification Code</h2>
-          <p>Please use the code below to access your booking dashboard:</p>
-          <div style="background: #e2e8f0; color: #1e293b; padding: 15px 30px; display: inline-block; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 8px;">
-              ${otp}
-          </div>
-          <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">This code expires in 10 minutes.</p>
-      `)
-    });
+    // --- Send success response immediately so the frontend shows "OTP Sent" ---
+    res.json({ success: true, message: 'Verification code sent to your email.' });
 
-    res.json({ success: true, message: 'OTP sent' });
+    // --- Send the Email in the background ---
+    (async () => {
+      try {
+        await transporter.sendMail({
+          from: `"Oz Tint & Wrap" <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: 'Your Verification Code - Oz Tint & Wrap',
+          html: generateEmailTemplate('Identity Verification', `
+              <div style="text-align: center;">
+                <p>You requested a code to manage your bookings. Please use the code below:</p>
+                <div style="background: #f1f5f9; color: #1e293b; padding: 20px; display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 20px 0;">
+                    ${otp}
+                </div>
+                <p style="font-size: 14px; color: #64748b;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
+              </div>
+          `)
+        });
+        console.log(`OTP successfully sent to: ${email}`);
+      } catch (mailError) {
+        // This log will appear in your Render "Logs" tab
+        console.error("CRITICAL: Failed to send OTP email via Nodemailer:", mailError.message);
+      }
+    })();
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server error sending OTP' });
+    console.error("OTP Controller Error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
   }
 };
 
