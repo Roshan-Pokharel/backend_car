@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
-const otpStore = require('../services/otpStore'); // Ensure this matches your directory
-const transporter = require('../services/mailing'); // Ensure this matches your directory
+const otpStore = require('../services/otpStore'); 
+
+const { sendEmail } = require('../services/mailing1'); 
 
 // --- HELPER: Professional Email Template Generator ---
 const generateEmailTemplate = (title, content, footerText = '') => {
@@ -28,18 +29,16 @@ const generateEmailTemplate = (title, content, footerText = '') => {
   `;
 };
 
-// 1. Create a New Booking (FIXED: Decoupled Email Sending)
+// 1. Create a New Booking
 exports.createBooking = async (req, res) => {
   try {
     const newBooking = new Booking(req.body);
     const savedBooking = await newBooking.save();
 
-    // --- CRITICAL FIX: Send success response to frontend IMMEDIATELY ---
-    // This prevents the frontend from timing out if email sending is slow or fails.
+    // --- Respond to Frontend IMMEDIATELY ---
     res.status(201).json({ success: true, message: "Booking confirmed", data: savedBooking });
 
-    // --- Background Email Process ---
-    // We execute this *after* the response is sent.
+    // --- Background Email Process (Resend) ---
     (async () => {
       try {
         const { 
@@ -75,32 +74,29 @@ exports.createBooking = async (req, res) => {
           <p>Our team will review your request and contact you shortly to confirm the details.</p>
         `;
 
-        // Send Emails in Parallel
+        // Send Emails in Parallel using Resend
+        // Note: 'to' for admin is set to EMAIL_USER from env, or hardcode your admin email here.
         await Promise.all([
-          transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER,
+          sendEmail({
+            to: process.env.EMAIL_USER, // Admin Email
             subject: `New Booking: ${serviceName} - ${date}`,
             html: generateEmailTemplate('Admin Notification', adminContent)
           }),
-          transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: email,
+          sendEmail({
+            to: email, // Customer Email
             subject: 'Booking Confirmation - Oz Tint & Wrap',
             html: generateEmailTemplate('Customer Receipt', customerContent)
           })
         ]);
-        console.log(`Emails sent for booking ID: ${savedBooking._id}`);
+        console.log(`Emails sent via Resend for booking ID: ${savedBooking._id}`);
 
       } catch (emailError) {
-        // Log the error so you can see it in Render logs, but DO NOT crash the server
-        console.error("Booking saved, but EMAIL FAILED:", emailError.message);
+        console.error("Booking saved, but EMAIL FAILED:", emailError);
       }
     })();
 
   } catch (error) {
     console.error("Booking Error:", error);
-    // Only send error response if we haven't already sent success
     if (!res.headersSent) {
       res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
@@ -172,14 +168,14 @@ exports.updateBookingStatus = async (req, res) => {
           `;
         }
 
-        await transporter.sendMail({
-          from: process.env.EMAIL_USER,
+        await sendEmail({
           to: booking.email,
           subject: `Booking Update: ${status}`,
           html: generateEmailTemplate(emailTitle, emailBody)
         });
+
       } catch (err) {
-        console.error("Status update saved, but EMAIL FAILED:", err.message);
+        console.error("Status update saved, but EMAIL FAILED:", err);
       }
     })();
 
@@ -191,46 +187,10 @@ exports.updateBookingStatus = async (req, res) => {
 };
 
 // 5. Send OTP for Customer Management
-// exports.sendManageOtp = async (req, res) => {
-//   try {
-//     const { email } = req.body;
-//     const bookingExists = await Booking.findOne({ email });
-    
-//     if (!bookingExists) {
-//       return res.status(404).json({ success: false, message: 'No bookings found for this email.' });
-//     }
-
-//     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-//     otpStore[email] = otp;
-//     setTimeout(() => delete otpStore[email], 10 * 60 * 1000); // Expires in 10 mins
-
-//     await transporter.sendMail({
-//       from: process.env.EMAIL_USER,
-//       to: email,
-//       subject: 'Manage Your Booking - Verification Code',
-//       html: generateEmailTemplate('Identity Verification', `
-//           <h2>Your Verification Code</h2>
-//           <p>Please use the code below to access your booking dashboard:</p>
-//           <div style="background: #e2e8f0; color: #1e293b; padding: 15px 30px; display: inline-block; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 8px;">
-//               ${otp}
-//           </div>
-//           <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">This code expires in 10 minutes.</p>
-//       `)
-//     });
-
-//     res.json({ success: true, message: 'OTP sent' });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ success: false, message: 'Server error sending OTP' });
-//   }
-// };
-
-// 5. Send OTP for Customer Management (FIXED)
 exports.sendManageOtp = async (req, res) => {
   try {
     const { email } = req.body;
     
-    // Check if customer actually exists
     const bookingExists = await Booking.findOne({ email });
     if (!bookingExists) {
       return res.status(404).json({ 
@@ -239,10 +199,7 @@ exports.sendManageOtp = async (req, res) => {
       });
     }
 
-    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Save to memory store
     otpStore[email] = otp;
     
     // Set expiration (10 minutes)
@@ -250,14 +207,13 @@ exports.sendManageOtp = async (req, res) => {
         if(otpStore[email]) delete otpStore[email];
     }, 10 * 60 * 1000);
 
-    // --- Send success response immediately so the frontend shows "OTP Sent" ---
+    // Send success response immediately
     res.json({ success: true, message: 'Verification code sent to your email.' });
 
-    // --- Send the Email in the background ---
+    // Send the Email in the background using Resend
     (async () => {
       try {
-        await transporter.sendMail({
-          from: `"Oz Tint & Wrap" <${process.env.EMAIL_USER}>`,
+        await sendEmail({
           to: email,
           subject: 'Your Verification Code - Oz Tint & Wrap',
           html: generateEmailTemplate('Identity Verification', `
@@ -272,8 +228,7 @@ exports.sendManageOtp = async (req, res) => {
         });
         console.log(`OTP successfully sent to: ${email}`);
       } catch (mailError) {
-        // This log will appear in your Render "Logs" tab
-        console.error("CRITICAL: Failed to send OTP email via Nodemailer:", mailError.message);
+        console.error("CRITICAL: Failed to send OTP email via Resend:", mailError);
       }
     })();
 
@@ -330,14 +285,14 @@ exports.customerCancelBooking = async (req, res) => {
           </div>
         `;
 
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER,
-            subject: `ACTION REQUIRED: Booking Cancelled - ${booking.firstName}`,
-            html: generateEmailTemplate('Cancellation Alert', adminBody)
+        await sendEmail({
+          to: process.env.EMAIL_USER,
+          subject: `ACTION REQUIRED: Booking Cancelled - ${booking.firstName}`,
+          html: generateEmailTemplate('Cancellation Alert', adminBody)
         });
+
       } catch (err) {
-        console.error("Cancellation processed, but EMAIL FAILED:", err.message);
+        console.error("Cancellation processed, but EMAIL FAILED:", err);
       }
     })();
 
@@ -376,14 +331,14 @@ exports.customerUpdateBooking = async (req, res) => {
           <p>Please check your dashboard for full updated details.</p>
         `;
 
-        await transporter.sendMail({
-          from: process.env.EMAIL_USER,
+        await sendEmail({
           to: process.env.EMAIL_USER,
           subject: `Booking Updated: ${booking.firstName}`,
           html: generateEmailTemplate('Update Alert', adminBody)
         });
+
       } catch (err) {
-        console.error("Update processed, but EMAIL FAILED:", err.message);
+        console.error("Update processed, but EMAIL FAILED:", err);
       }
     })();
 
