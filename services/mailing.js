@@ -1,32 +1,29 @@
+require('dotenv').config();
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // true for 465, false for other ports
+    port: 587,              // CHANGE: Use 587 instead of 465
+    secure: false,          // CHANGE: Must be false for port 587 (STARTTLS)
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
-    // --- TIMEOUT & NETWORK FIXES ---
-    // These must be at the ROOT level, not inside 'connectionOptions'
-    family: 4,              // Forces IPv4 (Critical fix for Render/Cloud timeouts)
-    connectionTimeout: 10000, // 10 seconds
+    // Network & Debug Settings
+    family: 4,              // Keep this (Force IPv4)
+    debug: true,            // NEW: Show verbose logs to debug the hang
+    logger: true,           // NEW: Log interaction to console
+    connectionTimeout: 10000, 
     greetingTimeout: 10000,
     socketTimeout: 15000,
-    dnsTimeout: 5000
 });
 
-// Verify connection on startup
+// Verify connection
 transporter.verify((error, success) => {
     if (error) {
-        console.error("❌ Nodemailer Setup Error:", error.message);
-        // Optional: details to help debug if it fails again
-        if (error.code === 'ETIMEDOUT') {
-            console.error("👉 Tip: Check if your firewall blocks port 465 or if IPv6 is active.");
-        }
+        console.error("❌ Nodemailer Setup Error:", error);
     } else {
-        console.log("✅ Nodemailer is ready to send emails!");
+        console.log("✅ Nodemailer is ready to send emails (Port 587)!");
     }
 });
 
