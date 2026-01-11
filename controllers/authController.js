@@ -28,18 +28,19 @@ module.exports.registerAdmin = async (req, res) => {
         // Create Token
         const token = jwt.sign({ email, id: newAdmin._id }, adminsecretkey, { expiresIn: '7d' });
 
-        // Send Cookie
+        // Send Cookie (Backup for desktop)
         res.cookie('adminAuthToken', token, { 
             httpOnly: true, 
-            secure: true,       // CRITICAL: Must be true for SameSite: None
-            sameSite: 'None',   // CRITICAL: Allows cookie cross-site (Vercel -> Render)
+            secure: true,      
+            sameSite: 'None',  
             maxAge: 7 * 24 * 60 * 60 * 1000 
         });
 
-        // Send Success JSON
+        // Send Success JSON WITH TOKEN
         return res.status(201).json({ 
             success: true, 
-            message: "Admin registered successfully" 
+            message: "Admin registered successfully",
+            token: token // <--- Added token here
         });
 
     } catch (err) {
@@ -67,17 +68,18 @@ module.exports.loginAdmin = async (req, res) => {
 
         const token = jwt.sign({ email, id: admin._id }, adminsecretkey, { expiresIn: '7d' });
 
-        // Send Cookie
+        // Send Cookie (Backup for desktop)
         res.cookie('adminAuthToken', token, {
             httpOnly: true,
-            secure: true,       // CRITICAL: Must be true for SameSite: None
-            sameSite: 'None',   // CRITICAL: Allows cookie cross-site (Vercel -> Render)
+            secure: true,       
+            sameSite: 'None',   
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
         return res.status(200).json({ 
             success: true, 
             message: "Login successful",
+            token: token, // <--- Added token here
             admin: { username: admin.username, email: admin.email }
         });
 
@@ -90,8 +92,6 @@ module.exports.loginAdmin = async (req, res) => {
 // Admin Logout
 module.exports.logoutAdmin = (req, res) => {
     try {
-        // Clear the secure cookie
-        // Options must match EXACTLY how it was set (except maxAge)
         res.clearCookie('adminAuthToken', {
             httpOnly: true,
             secure: true,

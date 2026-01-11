@@ -2,7 +2,12 @@
 const jwt = require('jsonwebtoken');
 
 const verifyAdmin = (req, res, next) => {
-    const token = req.cookies.adminAuthToken; // Read cookie
+    let token = req.cookies.adminAuthToken; // 1. Try Cookie
+
+    // 2. If no cookie, try Authorization Header (Bearer token)
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        token = req.headers.authorization.split(' ')[1];
+    }
 
     if (!token) {
         return res.status(401).json({ success: false, message: "Access denied. Please login." });
