@@ -1,5 +1,6 @@
 const Quote = require('../models/Quote');
-const transporter = require('../services/mailing'); // Ensure this path points to your mailing.js
+// Update this path to match your file structure
+const { sendEmail } = require('../services/mailing'); 
 
 // @desc    Create new quote
 // @route   POST /api/quotes
@@ -38,27 +39,23 @@ exports.createQuote = async (req, res) => {
       data: quote
     });
 
-    // --- Background Email Process ---
+    // --- Background Email Process (Resend) ---
     // This runs after the response is sent.
     (async () => {
         try {
             // --- EMAIL TEMPLATE STYLES ---
             const styles = {
-            container: `font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f4f4f4; padding: 20px; border-radius: 8px;`,
-            header: `background-color: #003366; color: #ffffff; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;`,
-            content: `background-color: #ffffff; padding: 20px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);`,
-            table: `width: 100%; border-collapse: collapse; margin-top: 20px;`,
-            th: `text-align: left; padding: 12px; background-color: #f8f9fa; border-bottom: 2px solid #dee2e6; color: #495057; font-size: 14px;`,
-            td: `padding: 12px; border-bottom: 1px solid #dee2e6; color: #212529; font-size: 14px;`,
-            footer: `text-align: center; font-size: 12px; color: #888888; margin-top: 20px;`
+              container: `font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f4f4f4; padding: 20px; border-radius: 8px;`,
+              header: `background-color: #003366; color: #ffffff; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;`,
+              content: `background-color: #ffffff; padding: 20px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);`,
+              table: `width: 100%; border-collapse: collapse; margin-top: 20px;`,
+              th: `text-align: left; padding: 12px; background-color: #f8f9fa; border-bottom: 2px solid #dee2e6; color: #495057; font-size: 14px;`,
+              td: `padding: 12px; border-bottom: 1px solid #dee2e6; color: #212529; font-size: 14px;`,
+              footer: `text-align: center; font-size: 12px; color: #888888; margin-top: 20px;`
             };
 
-            // 2. Prepare Email for Admin (Detailed Report)
-            const adminMailOptions = {
-            from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER,
-            subject: `New Quote Request: ${serviceType.toUpperCase()} - ${fullName}`,
-            html: `
+            // 2. Prepare Email HTML for Admin (Detailed Report)
+            const adminHtml = `
                 <div style="${styles.container}">
                 <div style="${styles.header}">
                     <h2 style="margin: 0;">New Quote Request</h2>
@@ -90,15 +87,10 @@ exports.createQuote = async (req, res) => {
                     <p>System Auto-Generated Email</p>
                 </div>
                 </div>
-            `
-            };
+            `;
 
-            // 3. Prepare Email for User (Professional Acknowledgement)
-            const userMailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'Quote Request Received',
-            html: `
+            // 3. Prepare Email HTML for User (Professional Acknowledgement)
+            const userHtml = `
                 <div style="${styles.container}">
                 <div style="${styles.header}">
                     <h2 style="margin: 0;">Quote Request Received</h2>
@@ -118,22 +110,29 @@ exports.createQuote = async (req, res) => {
                     </div>
                 </div>
                 <div style="${styles.footer}">
-                    <p>&copy; ${new Date().getFullYear()} Your Company Name. All rights reserved.</p>
+                    <p>&copy; ${new Date().getFullYear()} Oz Tint & Wrap. All rights reserved.</p>
                 </div>
                 </div>
-            `
-            };
+            `;
 
-            // 4. Send both emails
+            // 4. Send both emails using Resend
             await Promise.all([
-                transporter.sendMail(adminMailOptions),
-                transporter.sendMail(userMailOptions)
+                sendEmail({
+                    to: process.env.EMAIL_USER, // Admin email
+                    subject: `New Quote Request: ${serviceType.toUpperCase()} - ${fullName}`,
+                    html: adminHtml
+                }),
+                sendEmail({
+                    to: email, // Customer email
+                    subject: 'Quote Request Received',
+                    html: userHtml
+                })
             ]);
-            console.log(`Quote emails sent for ID: ${quote._id}`);
+            console.log(`Quote emails sent via Resend for ID: ${quote._id}`);
             
         } catch (emailError) {
             // Log error but do not crash the request
-            console.error("Quote saved, but EMAIL FAILED:", emailError.message);
+            console.error("Quote saved, but EMAIL FAILED:", emailError);
         }
     })();
 
@@ -188,40 +187,40 @@ exports.addCostAndSendEmail = async (req, res) => {
         // --- CRITICAL FIX: Send Response IMMEDIATELY ---
         res.status(200).json({ success: true, data: quote, message: 'Quote cost updated successfully!' });
 
-        // --- Background Email Process ---
+        // --- Background Email Process (Resend) ---
         (async () => {
             try {
-                // 2. Send Email
-                const mailOptions = {
-                    from: process.env.EMAIL_USER,
+                // 2. Prepare HTML
+                const costHtml = `
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2>Quote for ${quote.serviceType} Service</h2>
+                        <p>Hi ${quote.fullName},</p>
+                        <p>Thank you for your inquiry regarding your <strong>${quote.vehicleReg}</strong>.</p>
+                        
+                        <div style="background: #f4f4f4; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="margin:0; color: #333;">Estimated Cost: $${cost}</h3>
+                        </div>
+
+                        <p><strong>Service Details:</strong><br/>
+                        Type: ${quote.serviceType}<br/>
+                        ${quote.repairPart ? `Repair Part: ${quote.repairPart}<br/>` : ''}
+                        ${quote.tintCondition ? `Tint Condition: ${quote.tintCondition}<br/>` : ''}
+                        </p>
+
+                        <p>To proceed with this booking, please reply to this email or call us.</p>
+                    </div>
+                `;
+
+                // 3. Send Email
+                await sendEmail({
                     to: quote.email,
                     subject: 'Your Service Quote Estimation',
-                    html: `
-                        <div style="font-family: Arial, sans-serif; padding: 20px;">
-                            <h2>Quote for ${quote.serviceType} Service</h2>
-                            <p>Hi ${quote.fullName},</p>
-                            <p>Thank you for your inquiry regarding your <strong>${quote.vehicleReg}</strong>.</p>
-                            
-                            <div style="background: #f4f4f4; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                                <h3 style="margin:0; color: #333;">Estimated Cost: $${cost}</h3>
-                            </div>
-
-                            <p><strong>Service Details:</strong><br/>
-                            Type: ${quote.serviceType}<br/>
-                            ${quote.repairPart ? `Repair Part: ${quote.repairPart}<br/>` : ''}
-                            ${quote.tintCondition ? `Tint Condition: ${quote.tintCondition}<br/>` : ''}
-                            </p>
-
-                            <p>To proceed with this booking, please reply to this email or call us.</p>
-                        </div>
-                    `
-                };
-
-                await transporter.sendMail(mailOptions);
-                console.log(`Cost email sent to ${quote.email}`);
+                    html: costHtml
+                });
+                console.log(`Cost email sent via Resend to ${quote.email}`);
 
             } catch (emailError) {
-                console.error('Error sending quote cost email:', emailError.message);
+                console.error('Error sending quote cost email:', emailError);
             }
         })();
 
