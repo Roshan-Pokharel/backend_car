@@ -7,9 +7,10 @@ const connectDB = require('./config/db');
 // Connect to Database
 connectDB();
 
-app.set('trust proxy', 1);
+const app = express(); // ✅ CREATE APP FIRST
 
-const app = express();
+// Trust proxy (important for Render, AWS, HTTPS cookies)
+app.set('trust proxy', 1);
 
 /* =======================
    CORS CONFIG (FIRST)
@@ -20,7 +21,7 @@ const allowedOrigins = process.env.ALLOWEDORIGIN
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow server-to-server, Postman, mobile apps
+    // Allow Postman, mobile apps, server-to-server
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
@@ -65,8 +66,7 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 /* =======================
    SERVER
 ======================= */
-const PORT = process.env.PORT || 4000 ;
+const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
