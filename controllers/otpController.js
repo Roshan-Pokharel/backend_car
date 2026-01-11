@@ -1,7 +1,7 @@
 const Review = require('../models/Review.js'); 
-const transporter = require('../services/mailing');
+// UPDATE: Import the new sendEmail function instead of transporter
+const { sendEmail } = require('../services/mailing1'); 
 const otpStore = require('../services/otpStore');
-// create the otp and send email
 
 const getEmailTemplate = (otp) => `
     <!DOCTYPE html>
@@ -32,7 +32,6 @@ const getEmailTemplate = (otp) => `
 `;
 
 exports.createOtp = async (req, res) => { 
-    // ... (Keep existing code)
     const { email } = req.body;
     if (!email) {
         return res.status(400).json({ success: false, message: 'Email is required.' });
@@ -50,17 +49,24 @@ exports.createOtp = async (req, res) => {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         otpStore[email] = otp;
 
+        // OTP expiration (10 minutes)
         setTimeout(() => delete otpStore[email], 10 * 60 * 1000);
 
-        const mailOptions = {
-            from: '"Oz Tint & Wrap" <oztintandwrap@gmail.com>', 
+        // --- UPDATED EMAIL SENDING LOGIC ---
+        const result = await sendEmail({
             to: email,
             subject: 'Your Verification Code',
-            html: getEmailTemplate(otp) 
-        };
+            html: getEmailTemplate(otp)
+        });
 
-        await transporter.sendMail(mailOptions);
-        res.json({ success: true, message: 'OTP sent to your email.' });
+        if (result.success) {
+            res.json({ success: true, message: 'OTP sent to your email.' });
+        } else {
+            // Handle Resend specific errors
+            console.error('Email failed:', result.error);
+            res.status(500).json({ success: false, message: 'Failed to send email. Please try again.' });
+        }
+        // -----------------------------------
 
     } catch (error) {
         console.error('[ERROR]', error);
@@ -68,8 +74,7 @@ exports.createOtp = async (req, res) => {
     }
 }
 
-exports.verifyOtp =  (req, res) => {
-    // ... (Keep existing code)
+exports.verifyOtp = (req, res) => {
     const { userOtp, email } = req.body;
 
     if (!email || !userOtp) {
@@ -85,11 +90,10 @@ exports.verifyOtp =  (req, res) => {
 }
 
 exports.submitReview = async (req, res) => {
-    // ... (Keep existing code)
     try {
         const { name, carModel, rating, review, email } = req.body;
         
-        const existingReview = await Review.findOne({ email: email }); // Fixed syntax error from 'where' clause
+        const existingReview = await Review.findOne({ email: email });
         if (existingReview) {
             return res.status(400).json({ 
                 success: false, 
@@ -97,7 +101,7 @@ exports.submitReview = async (req, res) => {
             });
         }
 
-        const newReview = await Review.create({
+        await Review.create({
             name,
             email,
             carModel,
@@ -106,6 +110,7 @@ exports.submitReview = async (req, res) => {
             date: new Date()
         });
         
+        // Cleanup OTP just in case
         if(otpStore[email]) delete otpStore[email];
 
         res.json({ success: true, message: 'Review submitted successfully!' });
@@ -121,14 +126,10 @@ exports.submitReview = async (req, res) => {
 
 exports.getReviews = async (req, res) => {
     try {
-        // Run two queries in parallel for efficiency
         const [reviews, stats] = await Promise.all([
-            // 1. Get Top 9 Reviews
-            Review.find({}, 'name carModel rating review date') // Select only needed fields
+            Review.find({}, 'name carModel rating review date')
                 .sort({ rating: -1, date: -1 }) 
                 .limit(6), 
-
-            // 2. Calculate Total Count and Average Rating from ALL data
             Review.aggregate([
                 {
                     $group: {
@@ -156,11 +157,8 @@ exports.getReviews = async (req, res) => {
 
 exports.getAllReviews = async (req, res) => {
     try {
-        const reviews = await Review.find({}, 'name carModel rating review date') 
-        res.json({
-            reviews
-        });
-
+        const reviews = await Review.find({}, 'name carModel rating review date');
+        res.json({ reviews });
     } catch (error) {
         console.error('[DB ERROR]', error);
         res.status(500).json({ success: false, message: 'Failed to fetch reviews' });
