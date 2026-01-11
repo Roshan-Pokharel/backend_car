@@ -1,7 +1,7 @@
 const Booking = require('../models/Booking');
 const otpStore = require('../services/otpStore'); 
 
-const { sendEmail } = require('../services/mailing1'); 
+const { sendEmail } = require('../services/mailing'); 
 
 // --- HELPER: Professional Email Template Generator ---
 const generateEmailTemplate = (title, content, footerText = '') => {

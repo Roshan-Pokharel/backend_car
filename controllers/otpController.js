@@ -1,6 +1,6 @@
 const Review = require('../models/Review.js'); 
 // UPDATE: Import the new sendEmail function instead of transporter
-const { sendEmail } = require('../services/mailing1'); 
+const { sendEmail } = require('../services/mailing'); 
 const otpStore = require('../services/otpStore');
 
 const getEmailTemplate = (otp) => `

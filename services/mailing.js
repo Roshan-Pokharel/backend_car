@@ -1,23 +1,31 @@
 require('dotenv').config();
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        type: 'OAuth2',
-        user: process.env.EMAIL_USER,
-        clientId: process.env.OAUTH_CLIENT_ID,
-        clientSecret: process.env.OAUTH_CLIENT_SECRET,
-        refreshToken: process.env.OAUTH_REFRESH_TOKEN
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+/**
+ * Sends an email using Resend API (Bypasses Render SMTP block)
+ */
+const sendEmail = async ({ to, subject, html }) => {
+    try {
+        const { data, error } = await resend.emails.send({
+            from: 'Oz Tint & Wrap <no-reply@oztintandwrap.com>',
+            to: to,
+            subject: subject,
+            html: html,
+        });
+
+        if (error) {
+            console.error("Resend Error:", error);
+            return { success: false, error };
+        }
+
+        console.log("Email sent via API:", data.id);
+        return { success: true, data };
+    } catch (err) {
+        console.error("System Error:", err);
+        return { success: false, error: err.message };
     }
-});
+};
 
-transporter.verify((error, success) => {
-    if (error) {
-        console.error("❌ OAuth2 Error:", error);
-    } else {
-        console.log("✅ OAuth2 Authenticated & Ready!");
-    }
-});
-
-module.exports = transporter;
+module.exports = { sendEmail };

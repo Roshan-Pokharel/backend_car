@@ -1,6 +1,6 @@
 const Quote = require('../models/Quote');
 // Update this path to match your file structure
-const { sendEmail } = require('../services/mailing1'); 
+const { sendEmail } = require('../services/mailing'); 
 
 // @desc    Create new quote
 // @route   POST /api/quotes
