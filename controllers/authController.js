@@ -31,7 +31,8 @@ module.exports.registerAdmin = async (req, res) => {
         // Send Cookie
         res.cookie('adminAuthToken', token, { 
             httpOnly: true, 
-            secure: process.env.NODE_ENV === 'production', // Secure in production
+            secure: true,       // CRITICAL: Must be true for SameSite: None
+            sameSite: 'None',   // CRITICAL: Allows cookie cross-site (Vercel -> Render)
             maxAge: 7 * 24 * 60 * 60 * 1000 
         });
 
@@ -66,9 +67,11 @@ module.exports.loginAdmin = async (req, res) => {
 
         const token = jwt.sign({ email, id: admin._id }, adminsecretkey, { expiresIn: '7d' });
 
+        // Send Cookie
         res.cookie('adminAuthToken', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,       // CRITICAL: Must be true for SameSite: None
+            sameSite: 'None',   // CRITICAL: Allows cookie cross-site (Vercel -> Render)
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
@@ -84,16 +87,16 @@ module.exports.loginAdmin = async (req, res) => {
     }
 };
 
-// Add this to controllers/authController.js
-
+// Admin Logout
 module.exports.logoutAdmin = (req, res) => {
     try {
         // Clear the secure cookie
+        // Options must match EXACTLY how it was set (except maxAge)
         res.clearCookie('adminAuthToken', {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            path: '/' // Ensure path matches where cookie was set
+            secure: true,
+            sameSite: 'None',
+            path: '/' 
         });
 
         return res.status(200).json({ success: true, message: "Logged out successfully" });

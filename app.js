@@ -7,6 +7,8 @@ const connectDB = require('./config/db');
 // Connect to Database
 connectDB();
 
+app.set('trust proxy', 1);
+
 const app = express();
 
 /* =======================
