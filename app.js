@@ -19,24 +19,39 @@ const allowedOrigins = process.env.ALLOWEDORIGIN
   ? process.env.ALLOWEDORIGIN.split(',')
   : [];
 
-app.use(cors({
- origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
+// app.use(cors({
+//  origin: function (origin, callback) {
+//     if (!origin) return callback(null, true);
     
-    // Remove trailing slash from origin for comparison
-    const normalizedOrigin = origin.replace(/\/$/, "");
-    const normalizedAllowed = allowedOrigins.map(o => o.replace(/\/$/, ""));
+//     // Remove trailing slash from origin for comparison
+//     const normalizedOrigin = origin.replace(/\/$/, "");
+//     const normalizedAllowed = allowedOrigins.map(o => o.replace(/\/$/, ""));
 
-    if (normalizedAllowed.includes(normalizedOrigin) || normalizedOrigin.endsWith('.vercel.app')) {
+//     if (normalizedAllowed.includes(normalizedOrigin) || normalizedOrigin.endsWith('.vercel.app')) {
+//         return callback(null, true);
+//     } else {
+//         console.log('Blocked by CORS:', origin);
+//         return callback(new Error('Not allowed by CORS'));
+//     }
+// },
+//   credentials: true,
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'] // Added X-Requested-With for broader mobile support
+// }));
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/$/, "");
+    if (allowedOrigins.includes(normalizedOrigin) || normalizedOrigin.endsWith('.vercel.app')) {
         return callback(null, true);
-    } else {
-        console.log('Blocked by CORS:', origin);
-        return callback(new Error('Not allowed by CORS'));
     }
-},
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'] // Added X-Requested-With for broader mobile support
+  // Add these specific headers often required by mobile browsers
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'] 
 }));
 
 // Handle preflight requests
