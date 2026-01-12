@@ -1,12 +1,20 @@
-// middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
 
 const verifyAdmin = (req, res, next) => {
-    let token = req.cookies.adminAuthToken; // 1. Try Cookie
+    let token;
 
-    // 2. If no cookie, try Authorization Header (Bearer token)
-    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        token = req.headers.authorization.split(' ')[1];
+    // 1. PRIORITIZE HEADER (Best for Mobile/Cross-Site)
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+        } catch (e) {
+            token = null;
+        }
+    }
+    
+    // 2. Fallback to Cookie (Best for Desktop/Same-Site)
+    else if (req.cookies && req.cookies.adminAuthToken) {
+        token = req.cookies.adminAuthToken;
     }
 
     if (!token) {
@@ -15,10 +23,11 @@ const verifyAdmin = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.ADMIN_SECRET_KEY);
-        req.admin = decoded; // Add admin data to request
+        req.admin = decoded; 
         next();
     } catch (error) {
-        res.status(401).json({ success: false, message: "Invalid or expired token." });
+        // If token is expired or invalid
+        return res.status(401).json({ success: false, message: "Invalid or expired token." });
     }
 };
 
