@@ -11,11 +11,19 @@ const verifyAdmin = (req, res, next) => {
             token = null;
         }
     }
-    
-    // 2. Fallback to Cookie (Best for Desktop/Same-Site)
-    else if (req.cookies && req.cookies.adminAuthToken) {
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        token = req.headers.authorization.split(' ')[1];
+    }
+    // 2. Fallback to Cookie
+    else if (req.cookies.adminAuthToken) {
         token = req.cookies.adminAuthToken;
     }
+    
+    // 2. Fallback to Cookie (Best for Desktop/Same-Site)
+    // else if (req.cookies && req.cookies.adminAuthToken) {
+    //     token = req.cookies.adminAuthToken;
+    // }
 
     if (!token) {
         return res.status(401).json({ success: false, message: "Access denied. Please login." });
