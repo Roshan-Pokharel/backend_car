@@ -13,7 +13,7 @@ const app = express(); // ✅ CREATE APP FIRST
 app.set('trust proxy', 1);
 
 /* =======================
-   CORS CONFIG (FIRST)
+   CORS CONFIG (UPDATED)
 ======================= */
 const allowedOrigins = process.env.ALLOWEDORIGIN
   ? process.env.ALLOWEDORIGIN.split(',')
@@ -21,19 +21,27 @@ const allowedOrigins = process.env.ALLOWEDORIGIN
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow Postman, mobile apps, server-to-server
+    // 1. Allow requests with no origin (like Postman, mobile apps, curl)
     if (!origin) return callback(null, true);
 
+    // 2. Check if origin is explicitly in your ALLOWEDORIGIN .env list
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
-    } else {
-      console.log('Blocked by CORS:', origin);
-      return callback(new Error('Not allowed by CORS'));
+    } 
+    
+    // 3. ✅ NEW: Automatically allow any Vercel frontend 
+    // This is crucial for mobile compatibility if the URL shifts slightly (e.g., www vs non-www)
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
     }
+
+    // 4. Block everything else
+    console.log('Blocked by CORS:', origin);
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'] // Added X-Requested-With for broader mobile support
 }));
 
 // Handle preflight requests
